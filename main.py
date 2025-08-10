@@ -19,8 +19,7 @@ if response.status_code != 200:
     raise Exception("Failed to download cover image")
 
 img = Image.open(BytesIO(response.content))
-# Resize so largest side is 500px to save space
-img.thumbnail((500, 500), Image.Resampling.LANCZOS)
+img.thumbnail((500, 500), Image.Resampling.LANCZOS)  # Max 500px side
 cover_buffer = BytesIO()
 img.save(cover_buffer, format="JPEG", quality=85)
 cover_data = cover_buffer.getvalue()
@@ -29,48 +28,79 @@ cover_data = cover_buffer.getvalue()
 if not os.path.exists(album_name):
     os.makedirs(album_name)
 
-# === DOWNLOAD PLAYLIST AS MP3 ===
-print("[+] Downloading playlist...")
-ydl_opts = {
-    'format': 'bestaudio/best',
-    'outtmpl': os.path.join(album_name, '%(title)s.%(ext)s'),
-    'postprocessors': [
-        {
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '192'
-        }
-    ],
-    'noplaylist': False
+# === FETCH PLAYLIST INFO (preserve order) ===
+print("[+] Fetching playlist info...")
+ydl_info_opts = {
+    'extract_flat': True,
+    'dump_single_json': True,
+    'playlistend': 9999,
 }
+with yt_dlp.YoutubeDL(ydl_info_opts) as ydl:
+    info = ydl.extract_info(playlist_url, download=False)
 
-with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-    ydl.download([playlist_url])
+if 'entries' not in info or not info['entries']:
+    raise Exception("No videos found in playlist")
 
-# === ADD ID3 TAGS TO FILES ===
+# Build list of (title, url) in correct order
+playlist_videos = []
+for e in info['entries']:
+    if not e:
+        continue
+    url = e['url']
+    if not url.startswith("http"):
+        url = f"https://www.youtube.com/watch?v={url}"
+    playlist_videos.append((e['title'], url))
+
+# === DOWNLOAD MP3s IN ORDER ===
+print("[+] Downloading playlist...")
+for idx, (title, video_url) in enumerate(playlist_videos, start=1):
+    ydl_opts = {
+        'format': 'bestaudio/best',
+        'outtmpl': os.path.join(album_name, f"{idx:02d} - %(title)s.%(ext)s"),
+        'postprocessors': [
+            {
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192'
+            }
+        ],
+        'noplaylist': True
+    }
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        ydl.download([video_url])
+
+# === ADD ID3 TAGS WITH TRACK NUMBERS, TITLE (with prefix), ALBUM ARTIST ===
 print("[+] Adding ID3 tags...")
-for file in os.listdir(album_name):
-    if file.lower().endswith(".mp3"):
-        file_path = os.path.join(album_name, file)
+files = sorted([f for f in os.listdir(album_name) if f.lower().endswith(".mp3")])
 
-        # Basic tags
-        try:
-            audio = EasyID3(file_path)
-        except Exception:
-            audio = EasyID3()
-        audio['album'] = album_name
-        audio['artist'] = artist_name
-        audio.save(file_path)
+for track_num, file in enumerate(files, start=1):
+    file_path = os.path.join(album_name, file)
 
-        # Add cover image
-        id3 = ID3(file_path)
-        id3.add(APIC(
-            encoding=3,  # UTF-8
-            mime='image/jpeg',
-            type=3,  # front cover
-            desc='Cover',
-            data=cover_data
-        ))
-        id3.save(file_path)
+    # Extract title without number prefix and extension
+    title_only = file.split(" - ", 1)[-1].rsplit(".", 1)[0]
+    title_with_number = f"{track_num:02d} - {title_only}"
 
-print("[✓] Done! Files saved in:", album_name)
+    # Basic tags
+    try:
+        audio = EasyID3(file_path)
+    except Exception:
+        audio = EasyID3()
+    audio['album'] = album_name
+    audio['artist'] = artist_name
+    audio['albumartist'] = artist_name  # Album Artist tag
+    audio['title'] = title_with_number
+    audio['tracknumber'] = str(track_num)
+    audio.save(file_path)
+
+    # Add cover image
+    id3 = ID3(file_path)
+    id3.add(APIC(
+        encoding=3,  # UTF-8
+        mime='image/jpeg',
+        type=3,  # front cover
+        desc='Cover',
+        data=cover_data
+    ))
+    id3.save(file_path)
+
+print(f"[✓] Done! {len(files)} tracks saved in: {album_name}")
