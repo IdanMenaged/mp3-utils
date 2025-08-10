@@ -19,3 +19,7 @@ scripts to help with my mp3 player
 
 ## TODO
 - rtl support
+  - might want to add language user prompt
+- auto lyrics grabbing
+  - user manual "explains" how
+  - might want to add language user prompt
