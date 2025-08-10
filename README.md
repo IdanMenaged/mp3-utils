@@ -23,3 +23,5 @@ scripts to help with my mp3 player
 - auto lyrics grabbing
   - user manual "explains" how
   - might want to add language user prompt
+  - add dictionary mapping language and website/api to get lyrics
+  - how do i sync them?
