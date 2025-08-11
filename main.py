@@ -1,4 +1,5 @@
 import os
+import re
 import requests
 from PIL import Image
 from io import BytesIO
@@ -6,9 +7,13 @@ from mutagen.easyid3 import EasyID3
 from mutagen.id3 import ID3, APIC
 import yt_dlp
 
+def sanitize_name(name):
+    # Replace invalid filesystem chars with a space and strip extra spaces
+    return re.sub(r'[<>:"/\\|?*]', ' ', name).strip()
+
 # === USER INPUT ===
 playlist_url = input("YouTube playlist URL: ").strip()
-album_name = input("Album name: ").strip()
+album_name = sanitize_name(input("Album name: ").strip())
 artist_name_input = input("Artist name(s): ").strip()
 cover_url = input("Cover image URL: ").strip()
 
@@ -60,9 +65,10 @@ for e in info['entries']:
 # === DOWNLOAD MP3s IN ORDER ===
 print("[+] Downloading playlist...")
 for idx, (title, video_url) in enumerate(playlist_videos, start=1):
+    safe_title = sanitize_name(title)
     ydl_opts = {
         'format': 'bestaudio/best[ext=m4a]/bestaudio/best',
-        'outtmpl': os.path.join(album_name, f"{idx:02d} - %(title)s.%(ext)s"),
+        'outtmpl': os.path.join(album_name, f"{idx:02d} - {safe_title}.%(ext)s"),
         'postprocessors': [
             {
                 'key': 'FFmpegExtractAudio',
