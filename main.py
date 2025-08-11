@@ -9,8 +9,15 @@ import yt_dlp
 # === USER INPUT ===
 playlist_url = input("YouTube playlist URL: ").strip()
 album_name = input("Album name: ").strip()
-artist_name = input("Artist name: ").strip()
+artist_name_input = input("Artist name(s): ").strip()
 cover_url = input("Cover image URL: ").strip()
+
+# === PARSE MULTIPLE ARTISTS ===
+# Split on "&" or "," and trim spaces
+if "&" in artist_name_input or "," in artist_name_input:
+    artist_names = [a.strip() for a in artist_name_input.replace("&", ",").split(",") if a.strip()]
+else:
+    artist_names = [artist_name_input]
 
 # === DOWNLOAD & COMPRESS COVER IMAGE ===
 print("[+] Downloading cover image...")
@@ -18,7 +25,7 @@ response = requests.get(cover_url)
 if response.status_code != 200:
     raise Exception("Failed to download cover image")
 
-img = Image.open(BytesIO(response.content))
+img = Image.open(BytesIO(response.content)).convert("RGB")  # ensure RGB mode
 img.thumbnail((500, 500), Image.Resampling.LANCZOS)  # Max 500px side
 cover_buffer = BytesIO()
 img.save(cover_buffer, format="JPEG", quality=85)
@@ -41,7 +48,6 @@ with yt_dlp.YoutubeDL(ydl_info_opts) as ydl:
 if 'entries' not in info or not info['entries']:
     raise Exception("No videos found in playlist")
 
-# Build list of (title, url) in correct order
 playlist_videos = []
 for e in info['entries']:
     if not e:
@@ -55,7 +61,7 @@ for e in info['entries']:
 print("[+] Downloading playlist...")
 for idx, (title, video_url) in enumerate(playlist_videos, start=1):
     ydl_opts = {
-        'format': 'bestaudio/best',
+        'format': 'bestaudio/best[ext=m4a]/bestaudio/best',
         'outtmpl': os.path.join(album_name, f"{idx:02d} - %(title)s.%(ext)s"),
         'postprocessors': [
             {
@@ -69,7 +75,7 @@ for idx, (title, video_url) in enumerate(playlist_videos, start=1):
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         ydl.download([video_url])
 
-# === ADD ID3 TAGS WITH TRACK NUMBERS, TITLE (with prefix), ALBUM ARTIST ===
+# === ADD ID3 TAGS WITH MULTIPLE ARTISTS SUPPORT ===
 print("[+] Adding ID3 tags...")
 files = sorted([f for f in os.listdir(album_name) if f.lower().endswith(".mp3")])
 
@@ -80,19 +86,18 @@ for track_num, file in enumerate(files, start=1):
     title_only = file.split(" - ", 1)[-1].rsplit(".", 1)[0]
     title_with_number = f"{track_num:02d} - {title_only}"
 
-    # Basic tags
     try:
         audio = EasyID3(file_path)
     except Exception:
         audio = EasyID3()
+
     audio['album'] = album_name
-    audio['artist'] = artist_name
-    audio['albumartist'] = artist_name  # Album Artist tag
+    audio['artist'] = artist_names  # multiple artists as list
+    audio['albumartist'] = artist_names  # same for album artist
     audio['title'] = title_with_number
     audio['tracknumber'] = str(track_num)
     audio.save(file_path)
 
-    # Add cover image
     id3 = ID3(file_path)
     id3.add(APIC(
         encoding=3,  # UTF-8
