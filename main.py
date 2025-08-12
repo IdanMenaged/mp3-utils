@@ -76,7 +76,8 @@ for idx, (title, video_url) in enumerate(playlist_videos, start=1):
                 'preferredquality': '192'
             }
         ],
-        'noplaylist': True
+        'noplaylist': True,
+        'cookiesfrombrowser': ('firefox',),  # ('browser_name', 'profile_name') if needed
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         ydl.download([video_url])
