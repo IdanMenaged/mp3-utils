@@ -23,6 +23,8 @@ scripts to help with my mp3 player
 - any of these characters would be replaced with a space < > : " / \ | ? *
 
 ## TODO
+- correct mult artist format
+- add config file for the browser
 - rtl support
   - might want to add language user prompt
 - auto lyrics grabbing
