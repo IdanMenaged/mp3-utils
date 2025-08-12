@@ -67,7 +67,7 @@ print("[+] Downloading playlist...")
 for idx, (title, video_url) in enumerate(playlist_videos, start=1):
     safe_title = sanitize_name(title)
     ydl_opts = {
-        'format': 'bestaudio/best',
+        'format': 'bestaudio[ext=m4a]/bestaudio/best',
         'outtmpl': os.path.join(album_name, f"{idx:02d} - {safe_title}.%(ext)s"),
         'postprocessors': [
             {
