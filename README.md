@@ -6,10 +6,16 @@ scripts to help with my mp3 player
 
 ## usage
 ### formatting an album from a youtube playlist
-`python main.py`
+`python download_album.py`
 <br> answer the prompts
 <br> output should appear in the same directory as the script
 <br> you can now copy-paste the directory into your player
+
+### downloading a single song
+`python download_song.py`
+<br> answer the prompts
+<br> output should appear in the same directory as the script
+<br> you can now copy-paste the file into your player
 
 ## what does this actually do
 1. download the youtube videos as mp3 files
